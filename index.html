@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>OSINT Graph — Каталог инструментов</title>
+  <title>OSINT Framework — Каталог инструментов</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg: #0a0a0a;
@@ -16,8 +16,7 @@
       --accent: #00d4aa;
       --card: #1a1a1a;
       --border: #2a2a2a;
-      --primary: #00d4aa;
-      --secondary: #ff6b6b;
+      --sidebar: #121212;
     }
     
     * {
@@ -37,127 +36,205 @@
       color: var(--fg);
     }
     
-    /* Graph canvas area */
-    #graph-container {
-      position: relative;
-      width: 100%;
-      height: 700px;
-      min-height: 400px;
+    /* Sidebar */
+    .sidebar {
+      background: var(--sidebar);
+      min-height: 100vh;
+      border-right: 1px solid var(--border);
     }
     
-    .node {
-      position: absolute;
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
+    .sidebar-link {
       display: flex;
       align-items: center;
-      justify-content: center;
-      font-weight: 600;
-      font-size: 12px;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      z-index: 10;
-      border: 2px solid var(--border);
-    }
-    
-    .node:hover {
-      transform: scale(1.3);
-      z-index: 100;
-    }
-    
-    .node.active {
-      box-shadow: 0 0 25px var(--accent);
-      border-color: var(--accent);
-    }
-    
-    .node-label {
-      position: absolute;
-      bottom: -24px;
-      font-size: 10px;
-      text-align: center;
-      width: 48px;
+      padding: 0.875rem 1rem;
       color: var(--muted);
+      text-decoration: none;
       font-weight: 500;
+      font-size: 0.875rem;
+      transition: all 0.2s ease;
+      border-left: 3px solid transparent;
     }
     
-    .edge {
-      position: absolute;
-      background: var(--border);
-      pointer-events: none;
-      z-index: 1;
+    .sidebar-link:hover {
+      color: var(--fg);
+      background: var(--card);
+      border-left: 3px solid var(--accent);
     }
     
-    /* Controls */
-    .control-panel {
+    .sidebar-link.active {
+      color: var(--accent);
+      background: var(--card);
+      border-left: 3px solid var(--accent);
+    }
+    
+    .sidebar-link svg {
+      width: 18px;
+      height: 18px;
+      margin-right: 0.75rem;
+      flex-shrink: 0;
+    }
+    
+    /* Main content */
+    .main-content {
+      padding: 2rem;
+    }
+    
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+    }
+    
+    .page-title {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    
+    /* Tools grid */
+    .tools-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.5rem;
+    }
+    
+    /* Tool card */
+    .tool-card {
       background: var(--card);
       border: 1px solid var(--border);
+      border-radius: 8px;
       padding: 1.25rem;
-    }
-    
-    .category-btn {
-      padding: 0.6rem 1.2rem;
-      background: transparent;
-      border: 1px solid var(--border);
-      color: var(--muted);
-      font-size: 0.875rem;
+      transition: all 0.3s ease;
       cursor: pointer;
-      transition: all 0.2s ease;
-      margin-right: 0.5rem;
-      margin-bottom: 0.5rem;
     }
     
-    .category-btn:hover {
+    .tool-card:hover {
       border-color: var(--accent);
+      transform: translateY(-4px);
+      box-shadow: 0 8px 25px rgba(0, 212, 170, 0.15);
+    }
+    
+    .tool-card.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 20px rgba(0, 212, 170, 0.4);
+    }
+    
+    .tool-card.category-network { border-left: 4px solid #00d4aa; }
+    .tool-card.category-intelligence { border-left: 4px solid #ff6b6b; }
+    .tool-card.category-malware { border-left: 4px solid #ffa502; }
+    .tool-card.category-web { border-left: 4px solid #4ecdc4; }
+    
+    .tool-card .tool-name {
+      font-weight: 600;
+      font-size: 1.1rem;
+      margin-bottom: 0.25rem;
+    }
+    
+    .tool-card .tool-desc {
+      font-size: 0.8125rem;
+      color: var(--muted);
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    
+    .tool-card .tool-category {
+      font-size: 0.6875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
       color: var(--accent);
-    }
-    
-    .category-btn.active {
-      background: var(--accent);
-      color: var(--bg);
-    }
-    
-    .category-btn.secondary:hover {
-      border-color: var(--secondary);
-      color: var(--secondary);
-    }
-    
-    .category-btn.secondary.active {
-      background: var(--secondary);
-      color: var(--bg);
+      margin-top: 0.5rem;
     }
     
     /* Search */
+    .search-wrapper {
+      position: relative;
+    }
+    
     .search-input {
+      width: 100%;
       background: var(--bg);
       border: 1px solid var(--border);
+      padding: 0.75rem 1rem 0.75rem 2.5rem;
       color: var(--fg);
-      padding: 0.6rem 1rem;
-      width: 220px;
+      border-radius: 6px;
       font-size: 0.875rem;
+      transition: border-color 0.2s ease;
+    }
+    
+    .search-input:focus {
+      outline: none;
+      border-color: var(--accent);
     }
     
     .search-input::placeholder {
       color: var(--muted);
     }
     
-    /* Stats */
-    .stat-card {
-      background: var(--card);
+    .search-icon {
+      position: absolute;
+      left: 1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 18px;
+      height: 18px;
+      color: var(--muted);
+    }
+    
+    /* Filters */
+    .filter-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.5rem 0.875rem;
+      background: transparent;
       border: 1px solid var(--border);
-      padding: 1rem 1.25rem;
-      border-radius: 6px;
-      transition: transform 0.2s ease;
+      color: var(--muted);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-right: 0.5rem;
+      margin-bottom: 0.5rem;
     }
     
-    .stat-card:hover {
-      transform: translateY(-2px);
+    .filter-chip:hover {
+      border-color: var(--accent);
+      color: var(--accent);
     }
     
-    .stat-number {
-      font-size: 2.25rem;
+    .filter-chip.active {
+      background: var(--accent);
+      color: var(--bg);
+    }
+    
+    .filter-chip.secondary {
+      background: var(--card);
+    }
+    
+    .filter-chip.secondary:hover {
+      border-color: var(--secondary);
+      color: var(--secondary);
+    }
+    
+    .filter-chip.secondary.active {
+      background: var(--secondary);
+      color: var(--bg);
+    }
+    
+    /* Stats */
+    .stat-item {
+      text-align: center;
+    }
+    
+    .stat-value {
+      font-size: 2rem;
       font-weight: 700;
-      line-height: 1;
       color: var(--accent);
     }
     
@@ -177,24 +254,25 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 1000;
+      z-index: 100;
     }
     
     .modal-content {
       background: var(--card);
-      padding: 2rem;
-      width: 92%;
-      max-width: 560px;
-      border-radius: 12px;
       border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 90%;
+      max-width: 500px;
+      max-height: 90vh;
+      overflow-y: auto;
     }
     
     .modal-close {
       position: absolute;
       top: 1rem;
       right: 1rem;
-      width: 32px;
-      height: 32px;
+      width: 30px;
+      height: 30px;
       border-radius: 50%;
       background: transparent;
       border: 1px solid var(--border);
@@ -211,20 +289,51 @@
       color: var(--fg);
     }
     
-    /* Legend */
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.875rem;
-      color: var(--muted);
+    .modal-close svg {
+      width: 18px;
+      height: 18px;
     }
     
-    .legend-dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
+    .modal-tool-name {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
     }
+    
+    .modal-tool-category {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--accent);
+      margin-bottom: 1rem;
+      display: inline-block;
+    }
+    
+    .modal-tool-desc {
+      color: var(--muted);
+      font-size: 0.875rem;
+      line-height: 1.6;
+      margin-bottom: 1.5rem;
+    }
+    
+    /* Category badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.25rem 0.5rem;
+      background: var(--border);
+      border-radius: 4px;
+      font-size: 0.625rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-right: 0.25rem;
+    }
+    
+    .badge.network { background: rgba(0, 212, 170, 0.2); color: var(--accent); }
+    .badge.intelligence { background: rgba(255, 107, 107, 0.2); color: #ff6b6b; }
+    .badge.malware { background: rgba(255, 165, 2, 0.2); color: #ffa502; }
+    .badge.web { background: rgba(78, 205, 196, 0.2); color: #4ecdc4; }
     
     /* Reduced motion */
     @media (prefers-reduced-motion: reduce) {
@@ -235,14 +344,13 @@
     }
     
     /* Focus states */
-    .category-btn:focus-visible,
     .search-input:focus-visible,
+    .filter-chip:focus-visible,
     .modal-close:focus-visible {
       outline: 2px solid var(--accent);
       outline-offset: 2px;
     }
     
-    /* Scrollbar */
     ::-webkit-scrollbar {
       width: 6px;
     }
@@ -259,92 +367,58 @@
 </head>
 <body class="dark">
 
-  <!-- Navigation -->
-  <nav class="border-b border-[var(--border)] bg-[var(--card)]/80 backdrop-blur-lg sticky top-0 z-50">
-    <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-      <a href="#" class="text-xl font-bold tracking-tighter" style="color: var(--accent);">OSINT Graph</a>
-      
-      <div class="flex items-center gap-4">
-        <!-- Language switch -->
-        <div class="locale-switch relative" role="group" aria-label="Language">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="lucide lang-icon h-4 w-4 text-muted-foreground" aria-hidden="true">
-            <path d="m5 8 6 6"/>
-            <path d="m4 14 6-6"/>
-            <path d="M2 5h12"/>
-            <path d="M7 2h1"/>
-            <path d="m22 22-5-10-5 10"/>
-            <path d="M14 18h6"/>
-          </svg>
-          <button type="button" aria-pressed="true" class="locale-switch-option locale-switch-option-active ru-btn">RU</button>
-          <button type="button" aria-pressed="false" class="locale-switch-option en-btn">EN</button>
-        </div>
-        
-        <button class="btn-icon hidden md:inline-flex items-center gap-2 px-3 py-1 rounded hover:bg-[var(--border)] transition-colors" aria-label="Search">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-          <span class="text-xs hidden md-block">Поиск</span>
-        </button>
-      </div>
+  <!-- Sidebar -->
+  <div class="sidebar w-64 flex-shrink-0">
+    <div class="p-6 border-b border-[var(--border)]">
+      <h1 class="text-xl font-bold tracking-tighter" style="color: var(--accent);">OSINT Framework</h1>
+      <p class="text-sm text-muted-foreground mt-1">Каталог инструментов Open Source Intelligence</p>
     </div>
-  </nav>
+    
+    <nav class="p-6 space-y-1">
+      <!-- Category buttons -->
+      <button class="filter-chip active w-full" data-category="all">Все категории</button>
+      <button class="filter-chip w-full" data-category="network">Сеть</button>
+      <button class="filter-chip w-full secondary" data-category="intelligence">Интеллект</button>
+      <button class="filter-chip w-full secondary" data-category="malware">Мальвар</button>
+      <button class="filter-chip w-full secondary" data-category="web">Web</button>
+    </nav>
+    
+    <div class="p-6 border-t border-[var(--border)]">
+      <p class="text-xs text-muted-foreground">Всего инструментов: <span id="total-tools">25</span></p>
+    </div>
+  </div>
 
   <!-- Main Content -->
-  <main class="max-w-7xl mx-auto p-6 md:p-8">
+  <main class="main-content">
+    <!-- Header -->
+    <header class="header mb-6">
+      <h1 class="page-title">OSINT Graph — Tools Framework</h1>
+    </header>
     
-    <!-- Stats Summary -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-      <div class="stat-card rounded-lg">
-        <div class="stat-number" id="total-tools">0</div>
-        <div class="stat-label">Инструментов</div>
-      </div>
-      <div class="stat-card rounded-lg">
-        <div class="stat-number" id="total-categories">0</div>
-        <div class="stat-label">Категорий</div>
-      </div>
-      <div class="stat-card rounded-lg">
-        <div class="stat-number" id="active-tools">0</div>
-        <div class="stat-label">Активных</div>
-      </div>
+    <!-- Search -->
+    <div class="search-wrapper mb-6">
+      <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="text" id="search-input" class="search-input" placeholder="Поиск инструментов OSINT...">
     </div>
     
-    <!-- Controls -->
-    <div class="control-panel rounded-lg mb-6 flex flex-col md:flex-row gap-4 items-start md:items-center">
-      <div class="flex-1">
-        <input type="text" id="search-input" class="search-input w-full rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]" placeholder="Поиск инструментов...">
-      </div>
-      <div class="flex gap-2">
-        <button id="reset-btn" class="category-btn active" data-filter="all">Все</button>
-        <button id="cat-intelligence" class="category-btn" data-filter="intelligence">Интеллект</button>
-        <button id="cat-network" class="category-btn secondary" data-filter="network">Сеть</button>
-        <button id="cat-web" class="category-btn secondary" data-filter="web">Web</button>
-        <button id="cat-malware" class="category-btn secondary" data-filter="malware">Мальвар</button>
-      </div>
+    <!-- Tools Grid -->
+    <div id="tools-grid" class="tools-grid">
+      <!-- Cards loaded by JavaScript -->
     </div>
     
-    <!-- Graph Area -->
-    <div id="graph-container"></div>
-    
-    <!-- Legend -->
-    <div class="mt-8 pt-8 border-t border-[var(--border)] flex flex-wrap gap-4 text-sm text-muted-foreground">
-      <div class="legend-item">
-        <span class="legend-dot" style="background: #5a5a5a;"></span>
-        <span>Узлы (инструменты)</span>
-      </div>
-      <div class="legend-item">
-        <span class="legend-dot" style="background: #3a3a3a;"></span>
-        <span>Связи между инструментами</span>
-      </div>
-      <div class="legend-item">
-        <span class="legend-dot" style="background: var(--accent);"></span>
-        <span>Активные инструменты</span>
-      </div>
+    <!-- No results -->
+    <div id="no-results" class="hidden items-center py-12 text-center text-muted-foreground">
+      <svg class="w-12 h-12 mx-auto mb-3 opacity-50" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width=""><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <span>Инструменты не найдены</span>
     </div>
-    
   </main>
 
   <!-- Tool Details Modal -->
   <div id="tool-modal" class="modal-overlay hidden">
     <div class="modal-content">
-      <button class="modal-close" aria-label="Закрыть" onclick="closeModal()">&times;</button>
+      <button class="modal-close" aria-label="Закрыть" onclick="closeModal()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width=""><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
       <div id="modal-content-area">
         <!-- Content loaded dynamically -->
       </div>
@@ -352,7 +426,7 @@
   </div>
 
   <script>
-    // Data - OSINT tools with categories (expanded dataset)
+    // Data - OSINT tools with categories
     const toolsData = [
       { id: 1, name: 'Shodan', category: 'network', description: 'Поисковик для интернета вещей', active: true },
       { id: 2, name: 'Censys', category: 'network', description: 'Атаку поверхности интернета', active: true },
@@ -381,196 +455,89 @@
       { id: 25, name: 'GoBuster', category: 'web', description: 'Brute forcing директорий и DNS', active: true },
     ];
     
-    // Layout calculations
-    const container = document.getElementById('graph-container');
-    const svg = document.createElementNS ? document.createElementNS('http://www.w3.org/2000/svg', 'svg') : document.createElement('svg');
-    svg.setAttribute('width', '100%');
-    svg.setAttribute('height', '700');
-    svg.style.width = '100%';
-    svg.style.height = '700px';
-    svg.style.background = 'var(--bg)';
-    container.appendChild(svg);
+    // Category colors
+    const categoryColors = {
+      'network': { color: '#00d4aa', text: '#00d4aa' },
+      'intelligence': { color: '#ff6b6b', text: '#ff6b6b' },
+      'malware': { color: '#ffa502', text: '#ffa502' },
+      'web': { color: '#4ecdc4', text: '#4ecdc4' }
+    };
     
-    const width = container.clientWidth || 900;
-    const height = 700;
-    svg.setAttribute('width', width);
-    svg.setAttribute('height', height);
-    
-    // Calculate positions using circle layout by category
-    const categories = ['network', 'intelligence', 'malware', 'web'];
-    const categoryAngle = (Math.PI * 2) / categories.length;
-    const baseRadius = 180;
-    
-    const nodes = [];
-    const edges = [];
-    
-    toolsData.forEach((tool, index) => {
-      const catIndex = categories.indexOf(tool.category);
-      const angle = catIndex * categoryAngle + (Math.random() - 0.5) * 0.3;
-      const radius = baseRadius + Math.random() * 40;
-      
-      const x = width / 2 + radius * Math.cos(angle);
-      const y = height / 2 + radius * Math.sin(angle);
-      
-      nodes.push({
-        id: tool.id,
-        x: x,
-        y: y,
-        radius: 24,
-        title: tool.name,
-        category: tool.category,
-        active: tool.active,
-        description: tool.description
-      });
-    });
-    
-    // Create edges between tools in same category
-    toolsData.forEach((tool, i) => {
-      toolsData.slice(i + 1).forEach((other, j) => {
-        if (tool.category === other.category) {
-          edges.push({
-            source: tool.id,
-            target: other.id
-          });
-        }
-      });
-    });
-    
-    // Draw edges
-    const edgeGroup = document.createElementNS ? document.createElementNS('http://www.w3.org/2000/svg', 'g') : document.createElement('g');
-    edges.forEach(edge => {
-      const source = nodes.find(n => n.id === edge.source);
-      const target = nodes.find(n => n.id === edge.target);
-      if (source && target) {
-        const line = document.createElementNS ? document.createElementNS('http://www.w3.org/2000/svg', 'line') : document.createElement('line');
-        line.setAttribute('x1', source.x);
-        line.setAttribute('y1', source.y);
-        line.setAttribute('x2', target.x);
-        line.setAttribute('y2', target.y);
-        line.setAttribute('stroke', '#3a3a3a');
-        line.setAttribute('stroke-width', '1');
-        line.setAttribute('opacity', '0.2');
-        edgeGroup.appendChild(line);
-      }
-    });
-    svg.appendChild(edgeGroup);
-    
-    // Draw nodes
-    const nodeGroup = document.createElementNS ? document.createElementNS('http://www.w3.org/2000/svg', 'g') : document.createElement('g');
-    const activeNodes = new Set();
-    
-    nodes.forEach(node => {
-      // Node circle
-      const circle = document.createElementNS ? document.createElementNS('http://www.w3.org/2000/svg', 'circle') : document.createElement('circle');
-      circle.setAttribute('cx', node.x);
-      circle.setAttribute('cy', node.y);
-      circle.setAttribute('r', node.radius);
-      circle.setAttribute('fill', node.active ? '#00d4aa' : '#2a2a2a');
-      circle.setAttribute('stroke', node.active ? '#00d4aa' : '#2a2a2a');
-      circle.setAttribute('stroke-width', '2');
-      circle.setAttribute('data-id', node.id);
-      circle.setAttribute('class', 'node');
-      
-      circle.addEventListener('click', () => showToolDetails(node));
-      
-      if (node.active) {
-        activeNodes.add(node.id);
-        circle.classList.add('active');
-      }
-      
-      // Add category-specific color tint
-      const catColor = getCategoryColor(node.category);
-      circle.style.filter = `hue-rotate(${catColor}deg)`;
-      
-      nodeGroup.appendChild(circle);
-      
-      // Label
-      const label = document.createElement('div');
-      label.className = 'node-label';
-      label.textContent = node.title;
-      label.style.left = node.x - 24 + 'px';
-      label.style.top = (node.y + 32) + 'px';
-      label.style.position = 'absolute';
-      label.style.pointerEvents = 'none';
-      label.style.fontSize = '11px';
-      label.style.color = 'var(--muted)';
-      label.style.whiteSpace = 'nowrap';
-      document.body.appendChild(label);
-    });
-    
-    svg.appendChild(nodeGroup);
-    
-    // Category filters
-    const categoryBtns = document.querySelectorAll('.category-btn');
+    // DOM Elements
+    const toolsGrid = document.getElementById('tools-grid');
     const searchInput = document.getElementById('search-input');
+    const filterChips = document.querySelectorAll('.filter-chip');
+    const modal = document.getElementById('tool-modal');
+    const modalContent = document.getElementById('modal-content-area');
     
-    categoryBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        categoryBtns.forEach(b => b.classList.remove('active', 'secondary'));
-        btn.classList.add('active');
-        filterNodes(btn.dataset.filter);
+    // Render tools grid
+    function renderTools(filteredTools) {
+      if (filteredTools.length === 0) {
+        toolsGrid.innerHTML = '';
+        document.getElementById('no-results').classList.remove('hidden');
+        return;
+      }
+      
+      document.getElementById('no-results').classList.add('hidden');
+      
+      toolsGrid.innerHTML = filteredTools.map((tool, index) => `
+        <article class="tool-card category-${tool.category}" 
+                 data-id="${tool.id}" 
+                 data-category="${tool.category}"
+                 style="border-left-color: ${categoryColors[tool.category].color}">
+          <div class="flex items-start justify-between">
+            <div>
+              <h3 class="tool-name">${tool.name}</h3>
+              <p class="tool-desc">${tool.description}</p>
+            </div>
+            <span class="badge category-${tool.category}">${tool.category}</span>
+          </div>
+        </article>
+      `).join('');
+    }
+    
+    // Render initial grid
+    renderTools(toolsData);
+    
+    // Filter chips event listeners
+    filterChips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        // Update active state
+        filterChips.forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        
+        const category = chip.dataset.category;
+        const filteredTools = category === 'all' 
+          ? toolsData 
+          : toolsData.filter(t => t.category === category);
+        
+        renderTools(filteredTools);
       });
     });
-    
-    function filterNodes(filter) {
-      nodes.forEach(node => {
-        const show = filter === 'all' || node.category === filter;
-        const circle = svg.querySelector(`[data-id="${node.id}"]`);
-        if (circle) {
-          circle.style.opacity = show ? '1' : '0.3';
-        }
-        const label = document.querySelector(`.node-label[data-id="${node.id}"]`);
-        if (label) {
-          label.style.opacity = show ? '1' : '0.3';
-        }
-      });
-      
-      document.querySelectorAll('.node-label').forEach(label => {
-        const id = parseInt(label.getAttribute('data-id') || '0');
-        const node = nodes.find(n => n.id === id);
-        if (node) {
-          label.style.display = (filter === 'all' || node.category === filter) ? 'block' : 'none';
-        }
-      });
-    }
-    
-    function getCategoryColor(category) {
-      const colors = {
-        'network': 0,
-        'intelligence': 120,
-        'malware': 20,
-        'web': 240
-      };
-      return (colors[category] || 0) * 10;
-    }
     
     // Search functionality
-    let currentFilter = 'all';
-    
     searchInput.addEventListener('input', (e) => {
-      const term = e.target.value.toLowerCase();
-      nodes.forEach(node => {
-        const matches = node.title.toLowerCase().includes(term) || 
-                       node.description.toLowerCase().includes(term);
-        const circle = svg.querySelector(`[data-id="${node.id}"]`);
-        if (circle) {
-          circle.style.opacity = matches ? '1' : '0.3';
-        }
-      });
+      const term = e.target.value.toLowerCase().trim();
+      
+      if (!term) {
+        renderTools(toolsData);
+        return;
+      }
+      
+      const filteredTools = toolsData.filter(tool => 
+        tool.name.toLowerCase().includes(term) || 
+        tool.description.toLowerCase().includes(term)
+      );
+      
+      renderTools(filteredTools);
     });
     
-    // Reset button
-    document.getElementById('reset-btn').click();
-    
     // Modal functionality
-    function showToolDetails(node) {
-      const modal = document.getElementById('tool-modal');
-      const contentArea = document.getElementById('modal-content-area');
-      
-      contentArea.innerHTML = `
-        <h3 class="text-2xl font-semibold mb-3">${node.title}</h3>
-        <p class="text-muted-foreground text-sm mb-4">${node.description}</p>
-        <p class="text-sm text-muted-foreground">Категория: ${capitalize(node.category)}</p>
+    function showToolDetails(tool) {
+      modalContent.innerHTML = `
+        <h2 class="modal-tool-name">${tool.name}</h2>
+        <span class="modal-tool-category badge ${tool.category}">${capitalize(tool.category)}</span>
+        <p class="modal-tool-desc">${tool.description}</p>
       `;
       
       modal.classList.remove('hidden');
@@ -578,7 +545,6 @@
     }
     
     function closeModal() {
-      const modal = document.getElementById('tool-modal');
       modal.classList.add('hidden');
       modal.style.display = 'none';
     }
@@ -601,20 +567,21 @@
       ruBtn.classList.remove('locale-switch-option-active');
     });
     
+    // Modal close on overlay click
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        closeModal();
+      }
+    });
+    
     // Handle resize
     window.addEventListener('resize', () => {
-      const newWidth = container.clientWidth || 900;
-      svg.setAttribute('width', newWidth);
+      // Could re-calculate grid here
     });
     
     // Reduced motion check
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      nodes.forEach(node => {
-        const circle = svg.querySelector(`[data-id="${node.id}"]`);
-        if (circle) {
-          circle.style.opacity = '1';
-        }
-      });
+      // No animations needed
     }
   </script>
 </body>
