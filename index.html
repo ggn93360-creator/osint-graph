@@ -1,588 +1,580 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>OSINT Framework — Каталог инструментов</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #0a0a0a;
-      --fg: #fafafa;
-      --muted: #737373;
-      --accent: #00d4aa;
-      --card: #1a1a1a;
-      --border: #2a2a2a;
-      --sidebar: #121212;
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OSINT Graph Terminal</title>
+<script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.2/standalone/umd/vis-network.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/libphonenumber-js@1.11.2/bundle/libphonenumber-js.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/blueimp-md5@2.19.0/js/md5.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0a0a; --panel: #151515; --border: #2a2a2a;
+    --text: #fafafa; --muted: #8a8a8a; --accent: #00d4aa;
+    --sidebar-width: 380px;
+  }
+  * { box-sizing: border-box; }
+  body, html {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    overflow: hidden;
+  }
+  
+  .app-layout { display: flex; width: 100vw; height: 100vh; }
+
+  .graph-container {
+    flex: 1; position: relative;
+    background-image: radial-gradient(#222 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  #network { width: 100%; height: 100%; outline: none; }
+
+  /* Панель инструментов графа */
+  #toolbar {
+    position: absolute; bottom: 20px; left: 20px;
+    display: flex; gap: 10px; z-index: 10;
+  }
+  #toolbar button {
+    background: var(--panel); border: 1px solid var(--border);
+    color: var(--text); padding: 10px 15px; border-radius: 8px;
+    font-size: 0.9rem; font-weight: 600; cursor: pointer;
+    transition: all 0.2s; display: flex; align-items: center; gap: 5px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+  }
+  #toolbar button:hover { border-color: var(--accent); color: var(--accent); }
+  #toolbar button.active { background: var(--accent); color: #000; border-color: var(--accent); }
+
+  /* Боковая панель Инспектора */
+  #inspector {
+    width: var(--sidebar-width); background: var(--panel);
+    border-left: 1px solid var(--border); padding: 25px;
+    overflow-y: auto; flex-shrink: 0;
+    transform: translateX(100%); transition: transform 0.3s ease;
+    position: absolute; right: 0; top: 0; bottom: 0; z-index: 20;
+    box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+  }
+  #inspector.open { transform: translateX(0); }
+  #inspector h2 { margin: 0 0 10px; font-size: 1.4rem; color: var(--accent); word-break: break-all; line-height: 1.3; }
+  .type-badge { display: inline-block; font-size: 0.75rem; padding: 3px 8px; background: rgba(0,212,170,0.15); color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; margin-bottom: 20px; text-transform: uppercase; font-weight: bold; }
+  
+  .info-block { margin-bottom: 20px; border-bottom: 1px dashed var(--border); padding-bottom: 15px;}
+  .info-block:last-child { border-bottom: none; }
+  .info-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; margin-bottom: 6px; font-weight: 700;}
+  .info-value { font-size: 0.95rem; line-height: 1.6; word-break: break-all; white-space: pre-wrap; }
+  .info-value img { max-width: 100px; border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border); float: left; margin-right: 15px;}
+  
+  /* Кнопка ссылки */
+  .open-link-btn {
+    display: block; width: 100%; text-align: center;
+    background: var(--accent); color: #000; font-weight: 700;
+    padding: 12px; border-radius: 8px; text-decoration: none;
+    font-size: 0.95rem; transition: all 0.2s; margin-top: 10px;
+    border: 1px solid var(--accent);
+  }
+  .open-link-btn:hover { background: transparent; color: var(--accent); }
+
+  #close-inspector { position: absolute; top: 20px; right: 20px; background: none; border: none; color: var(--muted); font-size: 1.5rem; cursor: pointer; transition: color 0.2s; }
+  #close-inspector:hover { color: var(--text); }
+
+  /* HUD */
+  .hud {
+    position: absolute; top: 20px; left: 20px;
+    background: rgba(21, 21, 21, 0.85); border: 1px solid var(--border);
+    padding: 12px 20px; border-radius: 8px; pointer-events: none; z-index: 10;
+  }
+  .hud h1 { margin: 0 0 5px; font-size: 1.1rem; color: var(--accent); }
+  .hud p { margin: 0; font-size: 0.8rem; color: var(--muted); }
+
+  /* Меню ПКМ */
+  #ctx-menu {
+    position: absolute; display: none;
+    background: var(--panel); border: 1px solid var(--accent);
+    border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+    z-index: 1000; width: 300px; overflow: hidden;
+  }
+  #ctx-menu input {
+    width: 100%; box-sizing: border-box;
+    background: #000; border: none; border-bottom: 1px solid var(--border);
+    color: var(--text); padding: 12px 15px; font-size: 0.9rem;
+    font-family: ui-monospace, monospace; outline: none;
+  }
+  #ctx-menu input:focus { background: #0a0a0a; }
+  #ctx-menu input:last-of-type { border-bottom: 1px solid var(--accent); }
+  #ctx-menu button {
+    width: 100%; background: transparent; border: none;
+    color: var(--text); padding: 14px 15px; text-align: left;
+    font-size: 0.95rem; font-weight: 600; cursor: pointer;
+    transition: all 0.2s;
+  }
+  #ctx-menu button:hover { background: var(--accent); color: #000; }
+</style>
+</head>
+<body>
+
+<div class="app-layout">
+  <div class="graph-container" id="graph-container">
+    <div class="hud">
+      <h1>OSINT Graph</h1>
+      <p>ПКМ по полю → Добавить.<br>ЛКМ по узлу → Инфо.</p>
+    </div>
+    <div id="network"></div>
+    
+    <div id="toolbar">
+      <button id="btn-connect">🔗 Соединить</button>
+      <button id="btn-delete">🗑️ Удалить</button>
+      <button id="btn-physics" class="active">⚙️ Физика: ВКЛ</button>
+    </div>
+
+    <div id="ctx-menu">
+      <input type="text" id="ctx-input" placeholder="ФИО, Email, IP, Ник..." autocomplete="off">
+      <input type="text" id="ctx-dob" placeholder="Дата рождения (для ФИО)..." autocomplete="off">
+      <button id="ctx-btn">🔍 Анализировать</button>
+    </div>
+  </div>
+
+  <!-- ИНСПЕКТОР (Правая панель) -->
+  <div id="inspector">
+    <button id="close-inspector">✕</button>
+    <div id="inspector-content">
+      <p style="color:var(--muted); font-size:0.9rem;">Кликни на любой узел графа, чтобы увидеть подробности.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  /* =====================================================
+     ИНИЦИАЛИЗАЦИЯ ГРАФА
+     ===================================================== */
+  const container = document.getElementById('network');
+  const nodes = new vis.DataSet([]);
+  const edges = new vis.DataSet([]);
+  let nodeIdCounter = 0;
+
+  const data = { nodes, edges };
+  
+  const options = {
+    nodes: {
+      shape: 'box', 
+      borderRadius: 8, 
+      margin: 12,
+      font: { color: '#fff', size: 13, face: 'monospace' },
+      borderWidth: 2, 
+      shadow: { enabled: true, color: 'rgba(0,0,0,0.5)', size: 10, x: 2, y: 2 }
+    },
+    edges: {
+      color: { color: '#444', highlight: '#00d4aa' },
+      arrows: { to: { enabled: true, scaleFactor: 0.6 } },
+      smooth: { type: 'cubicBezier', roundness: 0.5 }
+    },
+    physics: {
+      enabled: true,
+      solver: 'forceAtlas2Based',
+      forceAtlas2Based: {
+        gravitationalConstant: -80,
+        centralGravity: 0.05,
+        springLength: 160,
+        springConstant: 0.08,
+        damping: 0.4,
+        avoidOverlap: 1
+      },
+      stabilization: { iterations: 100 }
+    },
+    interaction: { hover: true, dragNodes: true, dragView: true, tooltipDelay: 999999 }
+  };
+
+  const network = new vis.Network(container, data, options);
+
+  /* =====================================================
+     ИНСТРУМЕНТЫ
+     ===================================================== */
+  const btnConnect = document.getElementById('btn-connect');
+  const btnDelete = document.getElementById('btn-delete');
+  const btnPhysics = document.getElementById('btn-physics');
+  
+  let isConnecting = false;
+  let firstConnectNode = null;
+
+  btnConnect.addEventListener('click', () => {
+    isConnecting = !isConnecting;
+    btnConnect.classList.toggle('active', isConnecting);
+    firstConnectNode = null;
+    if(isConnecting) alert('Режим соединения ВКЛЮЧЕН.\nКликни по первому узлу, затем по второму.');
+  });
+
+  network.on("click", function(params) {
+    if (!isConnecting || params.nodes.length === 0) return;
+    let clickedNode = params.nodes[0];
+    if (!firstConnectNode) {
+      firstConnectNode = clickedNode;
+      network.selectNodes([clickedNode]);
+    } else if (firstConnectNode !== clickedNode) {
+      edges.add({ from: firstConnectNode, to: clickedNode, color: { color: '#00d4aa' } });
+      firstConnectNode = null;
+      isConnecting = false;
+      btnConnect.classList.remove('active');
+      network.unselectAll();
     }
-    
-    * {
-      box-sizing: border-box;
+  });
+
+  btnDelete.addEventListener('click', () => {
+    let selNodes = network.getSelectedNodes();
+    let selEdges = network.getSelectedEdges();
+    if (selNodes.length === 0 && selEdges.length === 0) {
+      alert('Сначала выдели мышкой узлы или линии, которые хочешь удалить.');
+      return;
     }
-    
-    body {
-      font-family: 'Inter', sans-serif;
-      background: var(--bg);
-      color: var(--fg);
-      margin: 0;
-      min-height: 100vh;
-    }
-    
-    .dark {
-      background: var(--bg);
-      color: var(--fg);
-    }
-    
-    /* Sidebar */
-    .sidebar {
-      background: var(--sidebar);
-      min-height: 100vh;
-      border-right: 1px solid var(--border);
-    }
-    
-    .sidebar-link {
-      display: flex;
-      align-items: center;
-      padding: 0.875rem 1rem;
-      color: var(--muted);
-      text-decoration: none;
-      font-weight: 500;
-      font-size: 0.875rem;
-      transition: all 0.2s ease;
-      border-left: 3px solid transparent;
-    }
-    
-    .sidebar-link:hover {
-      color: var(--fg);
-      background: var(--card);
-      border-left: 3px solid var(--accent);
-    }
-    
-    .sidebar-link.active {
-      color: var(--accent);
-      background: var(--card);
-      border-left: 3px solid var(--accent);
-    }
-    
-    .sidebar-link svg {
-      width: 18px;
-      height: 18px;
-      margin-right: 0.75rem;
-      flex-shrink: 0;
-    }
-    
-    /* Main content */
-    .main-content {
-      padding: 2rem;
-    }
-    
-    /* Header */
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 2rem;
-    }
-    
-    .page-title {
-      font-size: 2rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-    }
-    
-    /* Tools grid */
-    .tools-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 1.5rem;
-    }
-    
-    /* Tool card */
-    .tool-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 1.25rem;
-      transition: all 0.3s ease;
-      cursor: pointer;
-    }
-    
-    .tool-card:hover {
-      border-color: var(--accent);
-      transform: translateY(-4px);
-      box-shadow: 0 8px 25px rgba(0, 212, 170, 0.15);
-    }
-    
-    .tool-card.active {
-      border-color: var(--accent);
-      box-shadow: 0 0 20px rgba(0, 212, 170, 0.4);
-    }
-    
-    .tool-card.category-network { border-left: 4px solid #00d4aa; }
-    .tool-card.category-intelligence { border-left: 4px solid #ff6b6b; }
-    .tool-card.category-malware { border-left: 4px solid #ffa502; }
-    .tool-card.category-web { border-left: 4px solid #4ecdc4; }
-    
-    .tool-card .tool-name {
-      font-weight: 600;
-      font-size: 1.1rem;
-      margin-bottom: 0.25rem;
-    }
-    
-    .tool-card .tool-desc {
-      font-size: 0.8125rem;
-      color: var(--muted);
-      line-height: 1.5;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-    
-    .tool-card .tool-category {
-      font-size: 0.6875rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--accent);
-      margin-top: 0.5rem;
-    }
-    
-    /* Search */
-    .search-wrapper {
-      position: relative;
-    }
-    
-    .search-input {
-      width: 100%;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      padding: 0.75rem 1rem 0.75rem 2.5rem;
-      color: var(--fg);
-      border-radius: 6px;
-      font-size: 0.875rem;
-      transition: border-color 0.2s ease;
-    }
-    
-    .search-input:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
-    
-    .search-input::placeholder {
-      color: var(--muted);
-    }
-    
-    .search-icon {
-      position: absolute;
-      left: 1rem;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 18px;
-      height: 18px;
-      color: var(--muted);
-    }
-    
-    /* Filters */
-    .filter-chip {
-      display: inline-flex;
-      align-items: center;
-      padding: 0.5rem 0.875rem;
-      background: transparent;
-      border: 1px solid var(--border);
-      color: var(--muted);
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      border-radius: 20px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      margin-right: 0.5rem;
-      margin-bottom: 0.5rem;
-    }
-    
-    .filter-chip:hover {
-      border-color: var(--accent);
-      color: var(--accent);
-    }
-    
-    .filter-chip.active {
-      background: var(--accent);
-      color: var(--bg);
-    }
-    
-    .filter-chip.secondary {
-      background: var(--card);
-    }
-    
-    .filter-chip.secondary:hover {
-      border-color: var(--secondary);
-      color: var(--secondary);
-    }
-    
-    .filter-chip.secondary.active {
-      background: var(--secondary);
-      color: var(--bg);
-    }
-    
-    /* Stats */
-    .stat-item {
-      text-align: center;
-    }
-    
-    .stat-value {
-      font-size: 2rem;
-      font-weight: 700;
-      color: var(--accent);
-    }
-    
-    .stat-label {
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--muted);
-    }
-    
-    /* Modal */
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.85);
-      backdrop-filter: blur(6px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 100;
-    }
-    
-    .modal-content {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      width: 90%;
-      max-width: 500px;
-      max-height: 90vh;
-      overflow-y: auto;
-    }
-    
-    .modal-close {
-      position: absolute;
-      top: 1rem;
-      right: 1rem;
-      width: 30px;
-      height: 30px;
-      border-radius: 50%;
-      background: transparent;
-      border: 1px solid var(--border);
-      color: var(--muted);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.2s ease;
-    }
-    
-    .modal-close:hover {
-      background: var(--border);
-      color: var(--fg);
-    }
-    
-    .modal-close svg {
-      width: 18px;
-      height: 18px;
-    }
-    
-    .modal-tool-name {
-      font-size: 1.5rem;
-      font-weight: 600;
-      margin-bottom: 0.5rem;
-    }
-    
-    .modal-tool-category {
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--accent);
-      margin-bottom: 1rem;
-      display: inline-block;
-    }
-    
-    .modal-tool-desc {
-      color: var(--muted);
-      font-size: 0.875rem;
-      line-height: 1.6;
-      margin-bottom: 1.5rem;
-    }
-    
-    /* Category badges */
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 0.25rem 0.5rem;
-      background: var(--border);
-      border-radius: 4px;
-      font-size: 0.625rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--muted);
-      margin-right: 0.25rem;
-    }
-    
-    .badge.network { background: rgba(0, 212, 170, 0.2); color: var(--accent); }
-    .badge.intelligence { background: rgba(255, 107, 107, 0.2); color: #ff6b6b; }
-    .badge.malware { background: rgba(255, 165, 2, 0.2); color: #ffa502; }
-    .badge.web { background: rgba(78, 205, 196, 0.2); color: #4ecdc4; }
-    
-    /* Reduced motion */
-    @media (prefers-reduced-motion: reduce) {
-      * {
-        transition: none !important;
-        animation: none !important;
+    nodes.remove(selNodes);
+    edges.remove(selEdges);
+    closeInspector();
+  });
+
+  btnPhysics.addEventListener('click', () => {
+    let isEnabled = network.physics.physicsEnabled;
+    network.setOptions({ physics: { enabled: !isEnabled } });
+    btnPhysics.textContent = isEnabled ? '⚙️ Физика: ВЫКЛ' : '⚙️ Физика: ВКЛ';
+    btnPhysics.classList.toggle('active', !isEnabled);
+  });
+
+  /* =====================================================
+     ИНСПЕКТОР (ЛКМ по узлу)
+     ===================================================== */
+  const inspector = document.getElementById('inspector');
+  const inspectorContent = document.getElementById('inspector-content');
+  
+  document.getElementById('close-inspector').addEventListener('click', closeInspector);
+
+  function closeInspector() {
+    inspector.classList.remove('open');
+    network.unselectAll();
+  }
+
+  network.on("selectNode", function (params) {
+    if (params.nodes.length > 0) {
+      const nodeData = nodes.get(params.nodes[0]);
+      if (nodeData && nodeData.meta) {
+        renderInspector(nodeData);
+        inspector.classList.add('open');
       }
     }
+  });
+
+  network.on("deselectNode", closeInspector);
+
+  function renderInspector(node) {
+    const m = node.meta;
+    let html = '';
     
-    /* Focus states */
-    .search-input:focus-visible,
-    .filter-chip:focus-visible,
-    .modal-close:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 2px;
+    if (m.avatar) html += `<img src="${m.avatar}" onerror="this.style.display='none'">`;
+    html += `<h2>${esc(m.title || node.label)}</h2>`;
+    html += `<span class="type-badge">${esc(m.type || 'unknown')}</span>`;
+
+    if (m.description) {
+      html += `<div class="info-block"><div class="info-label">Описание / Запрос</div><div class="info-value">${esc(m.description)}</div></div>`;
+    }
+    if (m.stats) {
+      html += `<div class="info-block"><div class="info-label">Данные</div><div class="info-value">${esc(m.stats)}</div></div>`;
     }
     
-    ::-webkit-scrollbar {
-      width: 6px;
+    // Ссылка теперь без onclick, чистая HTML-ссылка
+    if (m.link) {
+      html += `<div class="info-block">
+        <div class="info-label">Перейти к результатам</div>
+        <a href="${esc(m.link)}" target="_blank" class="open-link-btn">Открыть страницу ↗</a>
+      </div>`;
     }
+
+    inspectorContent.innerHTML = html;
+  }
+
+  /* =====================================================
+     ДОБАВЛЕНИЕ УЗЛОВ
+     ===================================================== */
+  function addNode(label, group, metaData, parentId) {
+    const id = 'node_' + (nodeIdCounter++);
     
-    ::-webkit-scrollbar-track {
-      background: var(--bg);
+    let color = { background: '#1a1a1a', border: '#555' };
+    
+    if (group === 'input') { 
+      color = { background: '#ff9f43', border: '#ff9f43' }; 
     }
+    if (group === 'person') { color = { background: '#fdcb6e', border: '#fdcb6e' }; }
+    if (group === 'found') { color = { background: '#1a1a1a', border: '#00d4aa' }; }
+    if (group === 'email') { color = { background: '#ee5a24', border: '#ee5a24' }; }
+    if (group === 'ip') { color = { background: '#4ecdc4', border: '#4ecdc4' }; }
+    if (group === 'domain') { color = { background: '#00d4aa', border: '#00d4aa' }; }
+    if (group === 'phone') { color = { background: '#fd79a8', border: '#fd79a8' }; }
+    if (group === 'error') { color = { background: '#ff6b6b', border: '#ff6b6b' }; }
     
-    ::-webkit-scrollbar-thumb {
-      background: var(--border);
-      border-radius: 3px;
+    let fontOptions = { color: '#fff', size: 13 };
+    if (group === 'input' || group === 'person') {
+       fontOptions.color = '#000'; 
+       fontOptions.bold = true;
     }
-  </style>
-</head>
-<body class="dark">
 
-  <!-- Sidebar -->
-  <div class="sidebar w-64 flex-shrink-0">
-    <div class="p-6 border-b border-[var(--border)]">
-      <h1 class="text-xl font-bold tracking-tighter" style="color: var(--accent);">OSINT Framework</h1>
-      <p class="text-sm text-muted-foreground mt-1">Каталог инструментов Open Source Intelligence</p>
-    </div>
-    
-    <nav class="p-6 space-y-1">
-      <!-- Category buttons -->
-      <button class="filter-chip active w-full" data-category="all">Все категории</button>
-      <button class="filter-chip w-full" data-category="network">Сеть</button>
-      <button class="filter-chip w-full secondary" data-category="intelligence">Интеллект</button>
-      <button class="filter-chip w-full secondary" data-category="malware">Мальвар</button>
-      <button class="filter-chip w-full secondary" data-category="web">Web</button>
-    </nav>
-    
-    <div class="p-6 border-t border-[var(--border)]">
-      <p class="text-xs text-muted-foreground">Всего инструментов: <span id="total-tools">25</span></p>
-    </div>
-  </div>
+    nodes.add({
+      id: id, 
+      label: label, 
+      group: group, 
+      color: color, 
+      font: fontOptions,
+      meta: Object.assign({ type: group, title: label }, metaData)
+    });
 
-  <!-- Main Content -->
-  <main class="main-content">
-    <!-- Header -->
-    <header class="header mb-6">
-      <h1 class="page-title">OSINT Graph — Tools Framework</h1>
-    </header>
-    
-    <!-- Search -->
-    <div class="search-wrapper mb-6">
-      <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-      <input type="text" id="search-input" class="search-input" placeholder="Поиск инструментов OSINT...">
-    </div>
-    
-    <!-- Tools Grid -->
-    <div id="tools-grid" class="tools-grid">
-      <!-- Cards loaded by JavaScript -->
-    </div>
-    
-    <!-- No results -->
-    <div id="no-results" class="hidden items-center py-12 text-center text-muted-foreground">
-      <svg class="w-12 h-12 mx-auto mb-3 opacity-50" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width=""><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <span>Инструменты не найдены</span>
-    </div>
-  </main>
+    if (parentId) edges.add({ from: parentId, to: id });
+    return id;
+  }
 
-  <!-- Tool Details Modal -->
-  <div id="tool-modal" class="modal-overlay hidden">
-    <div class="modal-content">
-      <button class="modal-close" aria-label="Закрыть" onclick="closeModal()">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width=""><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-      <div id="modal-content-area">
-        <!-- Content loaded dynamically -->
-      </div>
-    </div>
-  </div>
+  function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 
-  <script>
-    // Data - OSINT tools with categories
-    const toolsData = [
-      { id: 1, name: 'Shodan', category: 'network', description: 'Поисковик для интернета вещей', active: true },
-      { id: 2, name: 'Censys', category: 'network', description: 'Атаку поверхности интернета', active: true },
-      { id: 3, name: 'Fofa', category: 'network', description: 'Китайский поисковик активов', active: true },
-      { id: 4, name: 'PassiveTotal', category: 'intelligence', description: 'Корреляция данных из пассивных DNS', active: true },
-      { id: 5, name: 'VirusTotal', category: 'malware', description: 'Анализ файлов и URL', active: true },
-      { id: 6, name: 'Any.Run', category: 'malware', description: 'Взаимодействие с муляркой в браузере', active: true },
-      { id: 7, name: 'Hybrid Analysis', category: 'malware', description: 'Анализ подозрительных файлов', active: true },
-      { id: 8, name: 'AbuseIPDB', category: 'intelligence', description: 'База данных злоупотребляющих IP', active: true },
-      { id: 9, name: 'OTX Alienvault', category: 'intelligence', description: 'Open Threat Exchange', active: true },
-      { id: 10, name: 'Greynoise', category: 'intelligence', description: 'Анализ сканирования интернета', active: true },
-      { id: 11, name: 'URLScan.io', category: 'web', description: 'Просмотр скриншотов страниц', active: true },
-      { id: 12, name: 'BuiltWith', category: 'web', description: 'Технологии сайтов', active: true },
-      { id: 13, name: 'Wappalyzer', category: 'web', description: 'Идентификация технологий', active: true },
-      { id: 14, name: 'Fiddler', category: 'web', description: 'Отладка HTTP/HTTPS', active: true },
-      { id: 15, name: 'Burp Suite', category: 'web', description: 'Тестирование безопасности веб', active: true },
-      { id: 16, name: 'Nikto', category: 'web', description: 'Сканер веб-серверов', active: true },
-      { id: 17, name: 'Nmap', category: 'network', description: 'Сканер портов сети', active: true },
-      { id: 18, name: 'Masscan', category: 'network', description: 'Быстрый сканер портов', active: true },
-      { id: 19, name: 'ZMap', category: 'network', description: 'Сканер全量 интернета', active: true },
-      { id: 20, name: 'Recon-ng', category: 'intelligence', description: 'Фреймворк разведки', active: true },
-      { id: 21, name: 'Maltego', category: 'intelligence', description: 'Графовый анализ данных', active: true },
-      { id: 22, name: 'SpiderFoot', category: 'intelligence', description: 'Автоматизированная разведка', active: true },
-      { id: 23, name: 'theHarvester', category: 'intelligence', description: 'Сбор информации о доменах', active: true },
-      { id: 24, name: 'Photon', category: 'web', description: 'Поисковик для OSINT', active: true },
-      { id: 25, name: 'GoBuster', category: 'web', description: 'Brute forcing директорий и DNS', active: true },
+  /* =====================================================
+     МЕНЮ ПКМ
+     ===================================================== */
+  const ctxMenu = document.getElementById('ctx-menu');
+  const ctxInput = document.getElementById('ctx-input');
+  const ctxDob = document.getElementById('ctx-dob');
+  const ctxBtn = document.getElementById('ctx-btn');
+  const graphContainer = document.getElementById('graph-container');
+
+  graphContainer.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+    ctxMenu.style.display = 'block';
+    ctxMenu.style.left = Math.min(e.clientX, window.innerWidth - 320) + 'px';
+    ctxMenu.style.top = Math.min(e.clientY, window.innerHeight - 160) + 'px';
+    ctxInput.value = ''; ctxDob.value = ''; ctxInput.focus();
+  });
+
+  document.addEventListener('click', function(e) {
+    if (e.target !== ctxMenu && !ctxMenu.contains(e.target)) ctxMenu.style.display = 'none';
+  });
+
+  ctxInput.addEventListener('keydown', e => { if (e.key === 'Enter') ctxBtn.click(); });
+  ctxDob.addEventListener('keydown', e => { if (e.key === 'Enter') ctxBtn.click(); });
+  ctxBtn.addEventListener('click', () => {
+    let val = ctxInput.value.trim(), dob = ctxDob.value.trim();
+    if (val) createGraphNode(val, dob);
+  });
+
+  /* =====================================================
+     ОПРЕДЕЛЕНИЕ ТИПА
+     ===================================================== */
+  function detectType(text, dob) {
+    const val = text.trim();
+    if (dob || /^[А-Яа-яЁёA-Za-z]+\s+[А-Яа-яЁёA-Za-z]+(\s+[А-Яа-яЁёA-Za-z]+)?$/.test(val)) return 'person';
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) return 'email';
+    if (/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(val)) return 'ip';
+    if (/^\+?[1-9]\d{7,14}$/.test(val.replace(/[\s\-\(\)]/g, '')) && !val.includes('.')) return 'phone'; 
+    if (/^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/.test(val)) return 'domain';
+    return 'username';
+  }
+
+  function createGraphNode(val, dob) {
+    ctxMenu.style.display = 'none';
+    let type = detectType(val, dob);
+    let title = type === 'person' ? `${val} (ДР: ${dob || '?'})` : val;
+    
+    let rootId = addNode(val, 'input', { type: type, title: title, description: dob ? `Дата рождения: ${dob}` : 'Начальный запрос' });
+    
+    if (type === 'person') analyzePerson(val, dob, rootId);
+    else if (type === 'email') analyzeEmail(val, rootId);
+    else if (type === 'ip') analyzeIP(val, rootId);
+    else if (type === 'phone') analyzePhone(val, rootId);
+    else if (type === 'domain') analyzeDomain(val, rootId);
+    else analyzeUsername(val, rootId);
+  }
+
+  /* =====================================================
+     АНАЛИЗ: ФИО
+     ===================================================== */
+  function analyzePerson(fullName, dob, rootId) {
+    let dobStr = dob ? ` ${dob}` : '';
+    let fullQuery = `"${fullName}"${dobStr}`;
+    
+    // 1. Google Общий
+    addNode('Google (Общий)', 'found', {
+      type: 'google', title: 'Google Общий', 
+      description: `Ищет любые упоминания.\nЗапрос: ${fullQuery}`,
+      link: `https://www.google.com/search?q=${encodeURIComponent(fullQuery)}`
+    }, rootId);
+
+    // 2. Google Соцсети
+    let socialQuery = `${fullQuery} (site:vk.com OR site:ok.ru OR site:facebook.com)`;
+    addNode('Google (Соцсети)', 'found', {
+      type: 'google', title: 'Google Соцсети', 
+      description: `Поиск профилей.\nЗапрос: ${socialQuery}`,
+      link: `https://www.google.com/search?q=${encodeURIComponent(socialQuery)}`
+    }, rootId);
+
+    // 3. Yandex
+    addNode('Yandex (Общий)', 'found', {
+      type: 'yandex', title: 'Yandex', 
+      description: `Поиск по Рунету.\nЗапрос: ${fullQuery}`,
+      link: `https://yandex.ru/search/?text=${encodeURIComponent(fullQuery)}`
+    }, rootId);
+
+    // 4. Суды
+    let courtQuery = `${fullQuery} (site:sudrf.ru OR filetype:pdf)`;
+    addNode('Суды / Документы', 'found', {
+      type: 'google', title: 'Судебные дела', 
+      description: `Поиск PDF и решений судов.\nЗапрос: ${courtQuery}`,
+      link: `https://www.google.com/search?q=${encodeURIComponent(courtQuery)}`
+    }, rootId);
+
+    // 5. Утечки
+    addNode('Утечки баз', 'found', {
+      type: 'link', title: 'Поиск утечек', 
+      description: `Проверить ФИО на наличие в базах`,
+      link: `https://leakcheck.io/?query=${encodeURIComponent(fullName)}`
+    }, rootId);
+  }
+
+  /* =====================================================
+     ЗАПРОСЫ
+     ===================================================== */
+  async function fetchWithFallback(targetUrl, type = 'json') {
+    const encUrl = encodeURIComponent(targetUrl);
+    const proxies = [
+      (u) => u, 
+      (u) => `https://api.allorigins.win/raw?url=${encUrl}`, // Добавлен надежный прокси
+      (u) => `https://corsproxy.io/?${encUrl}`, 
+      (u) => `https://api.codetabs.com/v1/proxy?quest=${encUrl}`
     ];
     
-    // Category colors
-    const categoryColors = {
-      'network': { color: '#00d4aa', text: '#00d4aa' },
-      'intelligence': { color: '#ff6b6b', text: '#ff6b6b' },
-      'malware': { color: '#ffa502', text: '#ffa502' },
-      'web': { color: '#4ecdc4', text: '#4ecdc4' }
-    };
-    
-    // DOM Elements
-    const toolsGrid = document.getElementById('tools-grid');
-    const searchInput = document.getElementById('search-input');
-    const filterChips = document.querySelectorAll('.filter-chip');
-    const modal = document.getElementById('tool-modal');
-    const modalContent = document.getElementById('modal-content-area');
-    
-    // Render tools grid
-    function renderTools(filteredTools) {
-      if (filteredTools.length === 0) {
-        toolsGrid.innerHTML = '';
-        document.getElementById('no-results').classList.remove('hidden');
-        return;
+    for (let i = 0; i < proxies.length; i++) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000); 
+        const res = await fetch(proxies[i](targetUrl), { signal: controller.signal, headers: { 'Accept': type === 'json' ? 'application/json' : 'text/html' } });
+        clearTimeout(timeoutId);
+        if (res.status === 404) throw new Error('404');
+        if (!res.ok) continue;
+        const text = await res.text();
+        if (text.includes('Error:') && text.length < 200) continue;
+        if (type === 'json') { try { return JSON.parse(text); } catch (e) { continue; } }
+        return text;
+      } catch (err) {
+        if (err.message === '404') throw err; continue; 
       }
-      
-      document.getElementById('no-results').classList.add('hidden');
-      
-      toolsGrid.innerHTML = filteredTools.map((tool, index) => `
-        <article class="tool-card category-${tool.category}" 
-                 data-id="${tool.id}" 
-                 data-category="${tool.category}"
-                 style="border-left-color: ${categoryColors[tool.category].color}">
-          <div class="flex items-start justify-between">
-            <div>
-              <h3 class="tool-name">${tool.name}</h3>
-              <p class="tool-desc">${tool.description}</p>
-            </div>
-            <span class="badge category-${tool.category}">${tool.category}</span>
-          </div>
-        </article>
-      `).join('');
     }
+    throw new Error('All proxies failed');
+  }
+
+  function dohQuery(name, type){
+    return fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(name)}&type=${type}`, { headers: { 'accept': 'application/dns-json' } })
+      .then(r => r.json()).then(j => ({ type, answers: j.Answer || [] })).catch(() => ({ type, answers: [] }));
+  }
+
+  /* =====================================================
+     АНАЛИЗ: USERNAME
+     ===================================================== */
+  async function analyzeUsername(username, rootId) {
+    const enc = encodeURIComponent(username);
     
-    // Render initial grid
-    renderTools(toolsData);
-    
-    // Filter chips event listeners
-    filterChips.forEach(chip => {
-      chip.addEventListener('click', () => {
-        // Update active state
-        filterChips.forEach(c => c.classList.remove('active'));
-        chip.classList.add('active');
-        
-        const category = chip.dataset.category;
-        const filteredTools = category === 'all' 
-          ? toolsData 
-          : toolsData.filter(t => t.category === category);
-        
-        renderTools(filteredTools);
-      });
-    });
-    
-    // Search functionality
-    searchInput.addEventListener('input', (e) => {
-      const term = e.target.value.toLowerCase().trim();
-      
-      if (!term) {
-        renderTools(toolsData);
-        return;
+    // GitHub
+    try {
+      let d = await fetchWithFallback(`https://api.github.com/users/${enc}`, 'json');
+      if (d && d.id) {
+        addNode(`GitHub: ${d.name || d.login}`, 'found', {
+          type: 'github', title: d.name || d.login, avatar: d.avatar_url,
+          description: d.bio || 'Нет описания', stats: `Repos: ${d.public_repos}\nFollowers: ${d.followers}\nСоздан: ${new Date(d.created_at).toLocaleDateString()}`, link: d.html_url
+        }, rootId);
+      } else {
+        addNode('GitHub: Не найден', 'error', { type: 'error', title: 'GitHub', description: 'Профиль не существует' }, rootId);
       }
-      
-      const filteredTools = toolsData.filter(tool => 
-        tool.name.toLowerCase().includes(term) || 
-        tool.description.toLowerCase().includes(term)
-      );
-      
-      renderTools(filteredTools);
-    });
-    
-    // Modal functionality
-    function showToolDetails(tool) {
-      modalContent.innerHTML = `
-        <h2 class="modal-tool-name">${tool.name}</h2>
-        <span class="modal-tool-category badge ${tool.category}">${capitalize(tool.category)}</span>
-        <p class="modal-tool-desc">${tool.description}</p>
-      `;
-      
-      modal.classList.remove('hidden');
-      modal.style.display = 'flex';
-    }
-    
-    function closeModal() {
-      modal.classList.add('hidden');
-      modal.style.display = 'none';
-    }
-    
-    function capitalize(str) {
-      return str.charAt(0).toUpperCase() + str.slice(1);
-    }
-    
-    // Language switch
-    const ruBtn = document.querySelector('.ru-btn');
-    const enBtn = document.querySelector('.en-btn');
-    
-    ruBtn.addEventListener('click', () => {
-      ruBtn.classList.add('locale-switch-option-active');
-      enBtn.classList.remove('locale-switch-option-active');
-    });
-    
-    enBtn.addEventListener('click', () => {
-      enBtn.classList.add('locale-switch-option-active');
-      ruBtn.classList.remove('locale-switch-option-active');
-    });
-    
-    // Modal close on overlay click
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) {
-        closeModal();
+    } catch(e) { addNode('GitHub: Ошибка', 'error', { type: 'error', title: 'GitHub', description: 'API недоступно' }, rootId); }
+
+    // Reddit
+    try {
+      let d = await fetchWithFallback(`https://www.reddit.com/user/${enc}/about.json`, 'json');
+      if (d && d.data && d.data.name && d.data.name.toLowerCase() === username.toLowerCase()) {
+        addNode(`Reddit: u/${d.data.name}`, 'found', {
+          type: 'reddit', title: `u/${d.data.name}`, avatar: d.data.icon_img?.split('?')[0],
+          description: d.data.subreddit?.public_description, stats: `Post Karma: ${d.data.link_karma}\nComment Karma: ${d.data.comment_karma}`, link: `https://reddit.com/user/${enc}`
+        }, rootId);
       }
+    } catch(e) {}
+
+    // Keybase
+    try {
+      let d = await fetchWithFallback(`https://keybase.io/_/api/1.0/user/lookup.json?username=${enc}`, 'json');
+      if (d && d.status && d.status.code === 0 && d.them && d.them.basics) {
+        let u = d.them;
+        addNode(`Keybase: ${u.basics.username}`, 'found', {
+          type: 'keybase', title: u.basics.username, avatar: u.pictures?.primary?.url,
+          description: u.profile?.bio || 'Нет описания', stats: `Full name: ${u.profile?.full_name || 'N/A'}`, link: `https://keybase.io/${enc}`
+        }, rootId);
+      }
+    } catch(e) {}
+  }
+
+  /* =====================================================
+     АНАЛИЗ: EMAIL
+     ===================================================== */
+  function analyzeEmail(email, rootId) {
+    const dom = email.split('@')[1];
+    const emailHash = md5(email.trim().toLowerCase());
+
+    fetch(`https://gravatar.com/${emailHash}.json`)
+      .then(res => { if(res.status===404) throw new Error(); return res.json(); })
+      .then(data => {
+        let profile = data.entry && data.entry[0];
+        if (profile) {
+          addNode(`Gravatar: ${profile.displayName || 'Найден'}`, 'found', {
+            type: 'gravatar', title: profile.displayName || 'Gravatar', avatar: `https://secure.gravatar.com/avatar/${emailHash}?s=150&d=404`,
+            description: profile.aboutMe || 'Нет описания', stats: `Location: ${profile.currentLocation || '?'}`, link: `https://gravatar.com/${emailHash}`
+          }, rootId);
+        }
+      }).catch(() => {});
+
+    Promise.all([dohQuery(dom, 'MX'), dohQuery(dom, 'TXT')]).then(results => {
+      let mx = results[0].answers.map(a => a.data);
+      if (mx.length > 0) addNode(`MX Запись`, 'domain', { type: 'dns', title: 'MX Сервер', description: mx.join('\n') }, rootId);
     });
-    
-    // Handle resize
-    window.addEventListener('resize', () => {
-      // Could re-calculate grid here
+
+    addNode(`LeakCheck`, 'found', { type: 'link', title: 'Утечки', description: `Поиск паролей и баз`, link: `https://leakcheck.io/?query=${encodeURIComponent(email)}` }, rootId);
+  }
+
+  /* =====================================================
+     АНАЛИЗ: IP, PHONE, DOMAIN
+     ===================================================== */
+  async function analyzeIP(ip, rootId) {
+    try {
+      let res = await fetch(`https://ipinfo.io/${encodeURIComponent(ip)}/json`);
+      let data = await res.json();
+      if (data.ip) {
+        addNode(`${data.city || '?'}, ${data.country || '?'}`, 'ip', {
+          type: 'ip', title: 'IP Инфо', description: `Провайдер: ${data.org || '?'}\nКоординаты: ${data.loc || '?'}\nЧасовой пояс: ${data.timezone || '?'}`
+        }, rootId);
+      }
+    } catch(e) {}
+  }
+
+  async function analyzePhone(phone, rootId) {
+    let clean = phone.replace(/[\s\-\(\)]/g, '');
+    let display = clean.charAt(0)==='+' ? clean : '+' + clean;
+    try {
+      let phoneNumber = libphonenumber.parsePhoneNumberFromString(display);
+      if (phoneNumber && phoneNumber.isValid()) {
+        addNode(`Номер`, 'phone', {
+          type: 'phone', title: phoneNumber.formatInternational(), description: `Страна: ${phoneNumber.country}\nТип: ${phoneNumber.getType()}`
+        }, rootId);
+      }
+    } catch(e) {}
+  }
+
+  function analyzeDomain(domain, rootId) {
+    dohQuery(domain, 'A').then(r => {
+      r.answers.forEach(a => addNode(`IP: ${a.data}`, 'ip', { type: 'dns', title: 'A Запись', description: a.data }, rootId));
     });
-    
-    // Reduced motion check
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      // No animations needed
-    }
-  </script>
+    dohQuery(domain, 'NS').then(r => {
+      r.answers.forEach(a => addNode(`NS: ${a.data}`, 'found', { type: 'dns', title: 'Name Server', description: a.data }, rootId));
+    });
+  }
+
+})();
+</script>
 </body>
 </html>
