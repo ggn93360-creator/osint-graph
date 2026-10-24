@@ -3,15 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OSINT Graph Terminal</title>
+<title>OSINT Graph — Fixed IP Engine</title>
 <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.2/standalone/umd/vis-network.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/libphonenumber-js@1.11.2/bundle/libphonenumber-js.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/blueimp-md5@2.19.0/js/md5.min.js"></script>
 <style>
   :root {
     --bg: #0a0a0a; --panel: #151515; --border: #2a2a2a;
     --text: #fafafa; --muted: #8a8a8a; --accent: #00d4aa;
-    --sidebar-width: 380px;
+    --sidebar-width: 420px;
   }
   * { box-sizing: border-box; }
   body, html {
@@ -30,7 +32,6 @@
   }
   #network { width: 100%; height: 100%; outline: none; }
 
-  /* Панель инструментов графа */
   #toolbar {
     position: absolute; bottom: 20px; left: 20px;
     display: flex; gap: 10px; z-index: 10;
@@ -45,7 +46,6 @@
   #toolbar button:hover { border-color: var(--accent); color: var(--accent); }
   #toolbar button.active { background: var(--accent); color: #000; border-color: var(--accent); }
 
-  /* Боковая панель Инспектора */
   #inspector {
     width: var(--sidebar-width); background: var(--panel);
     border-left: 1px solid var(--border); padding: 25px;
@@ -63,21 +63,35 @@
   .info-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; margin-bottom: 6px; font-weight: 700;}
   .info-value { font-size: 0.95rem; line-height: 1.6; word-break: break-all; white-space: pre-wrap; }
   .info-value img { max-width: 100px; border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border); float: left; margin-right: 15px;}
-  
-  /* Кнопка ссылки */
+
+  #map-container {
+    width: 100%; height: 300px; border-radius: 8px; overflow: hidden;
+    border: 1px solid var(--border); background: #1a1a1a; margin-top: 10px;
+    z-index: 5;
+  }
+  .leaflet-bar a { background-color: var(--panel) !important; color: var(--text) !important; border-bottom: 1px solid var(--border) !important; }
+  .leaflet-bar a:hover { background-color: var(--border) !important; }
+  .leaflet-popup-content-wrapper { background: var(--panel) !important; color: var(--text) !important; border: 1px solid var(--accent); }
+  .leaflet-popup-tip { background: var(--panel) !important; }
+
+  .search-result-item { margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border); }
+  .search-result-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .sr-title { color: #64a0ff !important; text-decoration: none !important; font-size: 1rem !important; font-weight: 600 !important; display: block !important; margin-bottom: 5px !important; }
+  .sr-title:hover { text-decoration: underline !important; }
+  .sr-snippet { color: var(--text); font-size: 0.85rem; line-height: 1.4; margin-bottom: 5px; }
+  .sr-url { color: var(--accent); font-size: 0.75rem; font-family: monospace; word-break: break-all; }
+
   .open-link-btn {
-    display: block; width: 100%; text-align: center;
-    background: var(--accent); color: #000; font-weight: 700;
-    padding: 12px; border-radius: 8px; text-decoration: none;
-    font-size: 0.95rem; transition: all 0.2s; margin-top: 10px;
+    display: block; width: 100%; text-align: center; background: transparent;
+    color: var(--accent); font-weight: 700; padding: 12px; border-radius: 8px;
+    text-decoration: none; font-size: 0.95rem; transition: all 0.2s; margin-top: 10px;
     border: 1px solid var(--accent);
   }
-  .open-link-btn:hover { background: transparent; color: var(--accent); }
+  .open-link-btn:hover { background: var(--accent); color: #000; }
 
-  #close-inspector { position: absolute; top: 20px; right: 20px; background: none; border: none; color: var(--muted); font-size: 1.5rem; cursor: pointer; transition: color 0.2s; }
+  #close-inspector { position: absolute; top: 20px; right: 20px; background: none; border: none; color: var(--muted); font-size: 1.5rem; cursor: pointer; }
   #close-inspector:hover { color: var(--text); }
 
-  /* HUD */
   .hud {
     position: absolute; top: 20px; left: 20px;
     background: rgba(21, 21, 21, 0.85); border: 1px solid var(--border);
@@ -86,7 +100,6 @@
   .hud h1 { margin: 0 0 5px; font-size: 1.1rem; color: var(--accent); }
   .hud p { margin: 0; font-size: 0.8rem; color: var(--muted); }
 
-  /* Меню ПКМ */
   #ctx-menu {
     position: absolute; display: none;
     background: var(--panel); border: 1px solid var(--accent);
@@ -94,18 +107,17 @@
     z-index: 1000; width: 300px; overflow: hidden;
   }
   #ctx-menu input {
-    width: 100%; box-sizing: border-box;
-    background: #000; border: none; border-bottom: 1px solid var(--border);
+    width: 100%; box-sizing: border-box; background: #000;
+    border: none; border-bottom: 1px solid var(--border);
     color: var(--text); padding: 12px 15px; font-size: 0.9rem;
     font-family: ui-monospace, monospace; outline: none;
   }
   #ctx-menu input:focus { background: #0a0a0a; }
   #ctx-menu input:last-of-type { border-bottom: 1px solid var(--accent); }
   #ctx-menu button {
-    width: 100%; background: transparent; border: none;
-    color: var(--text); padding: 14px 15px; text-align: left;
-    font-size: 0.95rem; font-weight: 600; cursor: pointer;
-    transition: all 0.2s;
+    width: 100%; background: transparent; border: none; color: var(--text);
+    padding: 14px 15px; text-align: left; font-size: 0.95rem; font-weight: 600;
+    cursor: pointer; transition: all 0.2s;
   }
   #ctx-menu button:hover { background: var(--accent); color: #000; }
 </style>
@@ -116,7 +128,7 @@
   <div class="graph-container" id="graph-container">
     <div class="hud">
       <h1>OSINT Graph</h1>
-      <p>ПКМ по полю → Добавить.<br>ЛКМ по узлу → Инфо.</p>
+      <p>ПКМ по полю → Добавить данные.<br>ЛКМ по узлу → Детальная инфа и Карта.</p>
     </div>
     <div id="network"></div>
     
@@ -133,11 +145,10 @@
     </div>
   </div>
 
-  <!-- ИНСПЕКТОР (Правая панель) -->
   <div id="inspector">
     <button id="close-inspector">✕</button>
     <div id="inspector-content">
-      <p style="color:var(--muted); font-size:0.9rem;">Кликни на любой узел графа, чтобы увидеть подробности.</p>
+      <p style="color:var(--muted); font-size:0.9rem;">Кликни на узел, чтобы прочитать данные.</p>
     </div>
   </div>
 </div>
@@ -146,9 +157,6 @@
 (function(){
   'use strict';
 
-  /* =====================================================
-     ИНИЦИАЛИЗАЦИЯ ГРАФА
-     ===================================================== */
   const container = document.getElementById('network');
   const nodes = new vis.DataSet([]);
   const edges = new vis.DataSet([]);
@@ -158,12 +166,10 @@
   
   const options = {
     nodes: {
-      shape: 'box', 
-      borderRadius: 8, 
-      margin: 12,
-      font: { color: '#fff', size: 13, face: 'monospace' },
-      borderWidth: 2, 
-      shadow: { enabled: true, color: 'rgba(0,0,0,0.5)', size: 10, x: 2, y: 2 }
+      shape: 'box', borderRadius: 8, margin: 12,
+      font: { color: '#fff', size: 13, face: 'monospace', multi: false, align: 'center' },
+      borderWidth: 2, shadow: { enabled: true, color: 'rgba(0,0,0,0.5)', size: 10, x: 2, y: 2 },
+      widthConstraint: { maximum: 220 }
     },
     edges: {
       color: { color: '#444', highlight: '#00d4aa' },
@@ -171,16 +177,8 @@
       smooth: { type: 'cubicBezier', roundness: 0.5 }
     },
     physics: {
-      enabled: true,
-      solver: 'forceAtlas2Based',
-      forceAtlas2Based: {
-        gravitationalConstant: -80,
-        centralGravity: 0.05,
-        springLength: 160,
-        springConstant: 0.08,
-        damping: 0.4,
-        avoidOverlap: 1
-      },
+      enabled: true, solver: 'forceAtlas2Based',
+      forceAtlas2Based: { gravitationalConstant: -80, centralGravity: 0.05, springLength: 160, springConstant: 0.08, damping: 0.4, avoidOverlap: 1 },
       stabilization: { iterations: 100 }
     },
     interaction: { hover: true, dragNodes: true, dragView: true, tooltipDelay: 999999 }
@@ -224,7 +222,7 @@
     let selNodes = network.getSelectedNodes();
     let selEdges = network.getSelectedEdges();
     if (selNodes.length === 0 && selEdges.length === 0) {
-      alert('Сначала выдели мышкой узлы или линии, которые хочешь удалить.');
+      alert('Сначала выдели узлы или линии.');
       return;
     }
     nodes.remove(selNodes);
@@ -240,16 +238,18 @@
   });
 
   /* =====================================================
-     ИНСПЕКТОР (ЛКМ по узлу)
+     ИНСПЕКТОР
      ===================================================== */
   const inspector = document.getElementById('inspector');
   const inspectorContent = document.getElementById('inspector-content');
+  let mapInstance = null;
   
   document.getElementById('close-inspector').addEventListener('click', closeInspector);
 
   function closeInspector() {
     inspector.classList.remove('open');
     network.unselectAll();
+    if (mapInstance) { mapInstance.remove(); mapInstance = null; }
   }
 
   network.on("selectNode", function (params) {
@@ -273,55 +273,94 @@
     html += `<span class="type-badge">${esc(m.type || 'unknown')}</span>`;
 
     if (m.description) {
-      html += `<div class="info-block"><div class="info-label">Описание / Запрос</div><div class="info-value">${esc(m.description)}</div></div>`;
-    }
-    if (m.stats) {
-      html += `<div class="info-block"><div class="info-label">Данные</div><div class="info-value">${esc(m.stats)}</div></div>`;
+      html += `<div class="info-block"><div class="info-label">Данные</div><div class="info-value">${esc(m.description)}</div></div>`;
     }
     
-    // Ссылка теперь без onclick, чистая HTML-ссылка
+    html += `<div id="map-container" style="display:none;"></div>`;
+
+    if (m.stats) {
+      html += `<div class="info-block"><div class="info-label">Дополнительно</div><div class="info-value">${esc(m.stats)}</div></div>`;
+    }
+    
+    if (m.searchResults && m.searchResults.length > 0) {
+      html += `<div class="info-block"><div class="info-label">Результаты поиска</div><div class="info-value">`;
+      m.searchResults.forEach(r => {
+        html += `<div class="search-result-item">
+            <a href="${esc(r.link)}" target="_blank" class="sr-title">${esc(r.title)}</a>
+            <div class="sr-snippet">${esc(r.snippet)}</div>
+            <div class="sr-url">${esc(r.link)}</div>
+        </div>`;
+      });
+      html += `</div></div>`;
+    }
+
     if (m.link) {
       html += `<div class="info-block">
-        <div class="info-label">Перейти к результатам</div>
-        <a href="${esc(m.link)}" target="_blank" class="open-link-btn">Открыть страницу ↗</a>
+        <div class="info-label">Источник</div>
+        <a href="${esc(m.link)}" target="_blank" class="open-link-btn">Перейти на сайт ↗</a>
       </div>`;
     }
 
     inspectorContent.innerHTML = html;
+
+    if (m.lat && m.lon) {
+      setTimeout(() => {
+        let mapDiv = document.getElementById('map-container');
+        if (!mapDiv) return;
+        
+        mapDiv.style.display = 'block';
+        if (mapInstance) mapInstance.remove(); 
+        
+        mapInstance = L.map('map-container', { zoomControl: true }).setView([m.lat, m.lon], 15);
+        
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+          attribution: 'Tiles &copy; Esri',
+          maxZoom: 19
+        }).addTo(mapInstance);
+        
+        L.marker([m.lat, m.lon]).addTo(mapInstance)
+          .bindPopup(esc(m.title || "Location")).openPopup();
+          
+        setTimeout(() => mapInstance.invalidateSize(), 200);
+      }, 50);
+    }
   }
 
   /* =====================================================
      ДОБАВЛЕНИЕ УЗЛОВ
      ===================================================== */
-  function addNode(label, group, metaData, parentId) {
+  function addNode(title, group, metaData, parentId) {
     const id = 'node_' + (nodeIdCounter++);
     
-    let color = { background: '#1a1a1a', border: '#555' };
+    let bgColor = '#1a1a1a', borderColor = '#555', textColor = '#fff';
     
-    if (group === 'input') { 
-      color = { background: '#ff9f43', border: '#ff9f43' }; 
+    if (group === 'input') { bgColor = '#ff9f43'; borderColor = '#ff9f43'; textColor = '#000'; }
+    if (group === 'person') { bgColor = '#fdcb6e'; borderColor = '#fdcb6e'; textColor = '#000'; }
+    if (group === 'found') { bgColor = '#1a1a1a'; borderColor = '#00d4aa'; textColor = '#fff'; }
+    if (group === 'email') { bgColor = '#ee5a24'; borderColor = '#ee5a24'; textColor = '#fff'; }
+    if (group === 'ip') { bgColor = '#4ecdc4'; borderColor = '#4ecdc4'; textColor = '#000'; }
+    if (group === 'domain') { bgColor = '#00d4aa'; borderColor = '#00d4aa'; textColor = '#000'; }
+    if (group === 'phone') { bgColor = '#fd79a8'; borderColor = '#fd79a8'; textColor = '#000'; }
+    if (group === 'error') { bgColor = '#ff6b6b'; borderColor = '#ff6b6b'; textColor = '#fff'; }
+
+    let labelStr = `${title}`;
+    
+    if (metaData.stats) {
+        let s = metaData.stats.replace(/\n/g, ' | ');
+        if (s.length > 35) s = s.substring(0, 32) + '...';
+        labelStr += `\n📊 ${s}`;
     }
-    if (group === 'person') { color = { background: '#fdcb6e', border: '#fdcb6e' }; }
-    if (group === 'found') { color = { background: '#1a1a1a', border: '#00d4aa' }; }
-    if (group === 'email') { color = { background: '#ee5a24', border: '#ee5a24' }; }
-    if (group === 'ip') { color = { background: '#4ecdc4', border: '#4ecdc4' }; }
-    if (group === 'domain') { color = { background: '#00d4aa', border: '#00d4aa' }; }
-    if (group === 'phone') { color = { background: '#fd79a8', border: '#fd79a8' }; }
-    if (group === 'error') { color = { background: '#ff6b6b', border: '#ff6b6b' }; }
     
-    let fontOptions = { color: '#fff', size: 13 };
-    if (group === 'input' || group === 'person') {
-       fontOptions.color = '#000'; 
-       fontOptions.bold = true;
+    if (metaData.description && metaData.description !== 'Нет описания' && metaData.description !== 'Загрузка результатов...' && metaData.description !== 'Начальный запрос') {
+        let d = metaData.description.replace(/\n/g, ' ').trim();
+        if (d.length > 35) d = d.substring(0, 32) + '...';
+        labelStr += `\n📝 ${d}`;
     }
 
     nodes.add({
-      id: id, 
-      label: label, 
-      group: group, 
-      color: color, 
-      font: fontOptions,
-      meta: Object.assign({ type: group, title: label }, metaData)
+      id: id, label: labelStr, group: group, 
+      color: { background: bgColor, border: borderColor }, font: { color: textColor },
+      meta: Object.assign({ type: group, title: title }, metaData)
     });
 
     if (parentId) edges.add({ from: parentId, to: id });
@@ -378,85 +417,47 @@
     
     let rootId = addNode(val, 'input', { type: type, title: title, description: dob ? `Дата рождения: ${dob}` : 'Начальный запрос' });
     
-    if (type === 'person') analyzePerson(val, dob, rootId);
-    else if (type === 'email') analyzeEmail(val, rootId);
+    let query = type === 'person' && dob ? `"${val}" ${dob}` : val;
+    liveSearch(query, rootId);
+
+    if (type === 'email') analyzeEmail(val, rootId);
     else if (type === 'ip') analyzeIP(val, rootId);
     else if (type === 'phone') analyzePhone(val, rootId);
     else if (type === 'domain') analyzeDomain(val, rootId);
-    else analyzeUsername(val, rootId);
+    else if (type === 'username') analyzeUsername(val, rootId);
   }
 
   /* =====================================================
-     АНАЛИЗ: ФИО
-     ===================================================== */
-  function analyzePerson(fullName, dob, rootId) {
-    let dobStr = dob ? ` ${dob}` : '';
-    let fullQuery = `"${fullName}"${dobStr}`;
-    
-    // 1. Google Общий
-    addNode('Google (Общий)', 'found', {
-      type: 'google', title: 'Google Общий', 
-      description: `Ищет любые упоминания.\nЗапрос: ${fullQuery}`,
-      link: `https://www.google.com/search?q=${encodeURIComponent(fullQuery)}`
-    }, rootId);
-
-    // 2. Google Соцсети
-    let socialQuery = `${fullQuery} (site:vk.com OR site:ok.ru OR site:facebook.com)`;
-    addNode('Google (Соцсети)', 'found', {
-      type: 'google', title: 'Google Соцсети', 
-      description: `Поиск профилей.\nЗапрос: ${socialQuery}`,
-      link: `https://www.google.com/search?q=${encodeURIComponent(socialQuery)}`
-    }, rootId);
-
-    // 3. Yandex
-    addNode('Yandex (Общий)', 'found', {
-      type: 'yandex', title: 'Yandex', 
-      description: `Поиск по Рунету.\nЗапрос: ${fullQuery}`,
-      link: `https://yandex.ru/search/?text=${encodeURIComponent(fullQuery)}`
-    }, rootId);
-
-    // 4. Суды
-    let courtQuery = `${fullQuery} (site:sudrf.ru OR filetype:pdf)`;
-    addNode('Суды / Документы', 'found', {
-      type: 'google', title: 'Судебные дела', 
-      description: `Поиск PDF и решений судов.\nЗапрос: ${courtQuery}`,
-      link: `https://www.google.com/search?q=${encodeURIComponent(courtQuery)}`
-    }, rootId);
-
-    // 5. Утечки
-    addNode('Утечки баз', 'found', {
-      type: 'link', title: 'Поиск утечек', 
-      description: `Проверить ФИО на наличие в базах`,
-      link: `https://leakcheck.io/?query=${encodeURIComponent(fullName)}`
-    }, rootId);
-  }
-
-  /* =====================================================
-     ЗАПРОСЫ
+     ЗАПРОСЫ С ФОЛБЭКОМ
      ===================================================== */
   async function fetchWithFallback(targetUrl, type = 'json') {
     const encUrl = encodeURIComponent(targetUrl);
     const proxies = [
       (u) => u, 
-      (u) => `https://api.allorigins.win/raw?url=${encUrl}`, // Добавлен надежный прокси
-      (u) => `https://corsproxy.io/?${encUrl}`, 
-      (u) => `https://api.codetabs.com/v1/proxy?quest=${encUrl}`
+      (u) => `https://api.allorigins.win/raw?url=${encUrl}`, 
+      (u) => `https://corsproxy.io/?${encUrl}`
     ];
     
     for (let i = 0; i < proxies.length; i++) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000); 
-        const res = await fetch(proxies[i](targetUrl), { signal: controller.signal, headers: { 'Accept': type === 'json' ? 'application/json' : 'text/html' } });
+        const timeoutId = setTimeout(() => controller.abort(), 8000); 
+        const res = await fetch(proxies[i](targetUrl), { 
+            signal: controller.signal, 
+            headers: { 'Accept': type === 'json' ? 'application/json' : 'text/html' } 
+        });
         clearTimeout(timeoutId);
         if (res.status === 404) throw new Error('404');
         if (!res.ok) continue;
         const text = await res.text();
         if (text.includes('Error:') && text.length < 200) continue;
-        if (type === 'json') { try { return JSON.parse(text); } catch (e) { continue; } }
+        if (type === 'json') { 
+            try { return JSON.parse(text); } catch (e) { continue; } 
+        }
         return text;
       } catch (err) {
-        if (err.message === '404') throw err; continue; 
+        if (err.message === '404') throw err; 
+        continue; 
       }
     }
     throw new Error('All proxies failed');
@@ -468,43 +469,57 @@
   }
 
   /* =====================================================
+     АНАЛИЗ: FULL IP (ЧЕРЕЗ IPWHO.IS)
+     ===================================================== */
+  async function analyzeIP(ip, rootId) {
+    try {
+      // ipwho.is отдает CORS без всяких прокси и работает по HTTPS
+      let res = await fetch(`https://ipwho.is/${encodeURIComponent(ip)}`);
+      let data = await res.json();
+      
+      if (data.success) {
+        let lat = data.latitude;
+        let lon = data.longitude;
+        
+        // Инфа о соединении
+        let conn = data.connection || {};
+        let isp = conn.isp || 'Неизвестно';
+        let org = conn.org || 'Неизвестно';
+        let asn = conn.asn || 'Неизвестно';
+        let type = conn.type || 'Неизвестно';
+
+        let desc = `Провайдер: ${isp}\nОрганизация: ${org}\nТип сети: ${type}\nASN: ${asn}`;
+        let stats = `Координаты: ${lat}, ${lon}`;
+
+        addNode(`${data.city || '?'}, ${data.country || '?'}`, 'ip', {
+          type: 'ip', 
+          title: `IP: ${data.ip}`, 
+          description: desc,
+          stats: stats,
+          lat: lat, 
+          lon: lon
+        }, rootId);
+      } else {
+        addNode(`${ip}`, 'ip', {
+          type: 'ip', title: `IP: ${ip}`, description: `Данные не получены (Неверный IP или блокировка)`
+        }, rootId);
+      }
+    } catch(e) {
+        addNode(`Ошибка IP`, 'error', { type: 'error', title: 'Ошибка', description: e.message }, rootId);
+    }
+  }
+
+  /* =====================================================
      АНАЛИЗ: USERNAME
      ===================================================== */
   async function analyzeUsername(username, rootId) {
     const enc = encodeURIComponent(username);
-    
-    // GitHub
     try {
       let d = await fetchWithFallback(`https://api.github.com/users/${enc}`, 'json');
       if (d && d.id) {
         addNode(`GitHub: ${d.name || d.login}`, 'found', {
-          type: 'github', title: d.name || d.login, avatar: d.avatar_url,
-          description: d.bio || 'Нет описания', stats: `Repos: ${d.public_repos}\nFollowers: ${d.followers}\nСоздан: ${new Date(d.created_at).toLocaleDateString()}`, link: d.html_url
-        }, rootId);
-      } else {
-        addNode('GitHub: Не найден', 'error', { type: 'error', title: 'GitHub', description: 'Профиль не существует' }, rootId);
-      }
-    } catch(e) { addNode('GitHub: Ошибка', 'error', { type: 'error', title: 'GitHub', description: 'API недоступно' }, rootId); }
-
-    // Reddit
-    try {
-      let d = await fetchWithFallback(`https://www.reddit.com/user/${enc}/about.json`, 'json');
-      if (d && d.data && d.data.name && d.data.name.toLowerCase() === username.toLowerCase()) {
-        addNode(`Reddit: u/${d.data.name}`, 'found', {
-          type: 'reddit', title: `u/${d.data.name}`, avatar: d.data.icon_img?.split('?')[0],
-          description: d.data.subreddit?.public_description, stats: `Post Karma: ${d.data.link_karma}\nComment Karma: ${d.data.comment_karma}`, link: `https://reddit.com/user/${enc}`
-        }, rootId);
-      }
-    } catch(e) {}
-
-    // Keybase
-    try {
-      let d = await fetchWithFallback(`https://keybase.io/_/api/1.0/user/lookup.json?username=${enc}`, 'json');
-      if (d && d.status && d.status.code === 0 && d.them && d.them.basics) {
-        let u = d.them;
-        addNode(`Keybase: ${u.basics.username}`, 'found', {
-          type: 'keybase', title: u.basics.username, avatar: u.pictures?.primary?.url,
-          description: u.profile?.bio || 'Нет описания', stats: `Full name: ${u.profile?.full_name || 'N/A'}`, link: `https://keybase.io/${enc}`
+          type: 'github', title: `GitHub: ${d.name || d.login}`, avatar: d.avatar_url,
+          description: d.bio || 'Нет описания', stats: `Repos: ${d.public_repos} | Followers: ${d.followers}`, link: d.html_url
         }, rootId);
       }
     } catch(e) {}
@@ -523,43 +538,24 @@
         let profile = data.entry && data.entry[0];
         if (profile) {
           addNode(`Gravatar: ${profile.displayName || 'Найден'}`, 'found', {
-            type: 'gravatar', title: profile.displayName || 'Gravatar', avatar: `https://secure.gravatar.com/avatar/${emailHash}?s=150&d=404`,
+            type: 'gravatar', title: `Gravatar: ${profile.displayName || 'Найден'}`, avatar: `https://secure.gravatar.com/avatar/${emailHash}?s=150&d=404`,
             description: profile.aboutMe || 'Нет описания', stats: `Location: ${profile.currentLocation || '?'}`, link: `https://gravatar.com/${emailHash}`
           }, rootId);
         }
       }).catch(() => {});
-
-    Promise.all([dohQuery(dom, 'MX'), dohQuery(dom, 'TXT')]).then(results => {
-      let mx = results[0].answers.map(a => a.data);
-      if (mx.length > 0) addNode(`MX Запись`, 'domain', { type: 'dns', title: 'MX Сервер', description: mx.join('\n') }, rootId);
-    });
-
-    addNode(`LeakCheck`, 'found', { type: 'link', title: 'Утечки', description: `Поиск паролей и баз`, link: `https://leakcheck.io/?query=${encodeURIComponent(email)}` }, rootId);
   }
 
   /* =====================================================
-     АНАЛИЗ: IP, PHONE, DOMAIN
+     АНАЛИЗ: PHONE, DOMAIN, LIVE SEARCH
      ===================================================== */
-  async function analyzeIP(ip, rootId) {
-    try {
-      let res = await fetch(`https://ipinfo.io/${encodeURIComponent(ip)}/json`);
-      let data = await res.json();
-      if (data.ip) {
-        addNode(`${data.city || '?'}, ${data.country || '?'}`, 'ip', {
-          type: 'ip', title: 'IP Инфо', description: `Провайдер: ${data.org || '?'}\nКоординаты: ${data.loc || '?'}\nЧасовой пояс: ${data.timezone || '?'}`
-        }, rootId);
-      }
-    } catch(e) {}
-  }
-
   async function analyzePhone(phone, rootId) {
     let clean = phone.replace(/[\s\-\(\)]/g, '');
     let display = clean.charAt(0)==='+' ? clean : '+' + clean;
     try {
       let phoneNumber = libphonenumber.parsePhoneNumberFromString(display);
       if (phoneNumber && phoneNumber.isValid()) {
-        addNode(`Номер`, 'phone', {
-          type: 'phone', title: phoneNumber.formatInternational(), description: `Страна: ${phoneNumber.country}\nТип: ${phoneNumber.getType()}`
+        addNode(`Номер: ${phoneNumber.formatInternational()}`, 'phone', {
+          type: 'phone', title: `Номер`, description: `Страна: ${phoneNumber.country}\nТип: ${phoneNumber.getType()}`
         }, rootId);
       }
     } catch(e) {}
@@ -567,11 +563,68 @@
 
   function analyzeDomain(domain, rootId) {
     dohQuery(domain, 'A').then(r => {
-      r.answers.forEach(a => addNode(`IP: ${a.data}`, 'ip', { type: 'dns', title: 'A Запись', description: a.data }, rootId));
+      r.answers.forEach(a => {
+        analyzeIP(a.data, rootId);
+      });
     });
-    dohQuery(domain, 'NS').then(r => {
-      r.answers.forEach(a => addNode(`NS: ${a.data}`, 'found', { type: 'dns', title: 'Name Server', description: a.data }, rootId));
-    });
+  }
+
+  async function liveSearch(query, parentId) {
+    let id = addNode(`Live Search: ${query.substring(0,15)}...`, 'found', {
+      type: 'search', title: `Поиск: ${query}`, description: 'Загрузка результатов...', stats: '⏳ Сканирую...'
+    }, parentId);
+
+    try {
+      let url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+      let html = await fetchWithFallback(url, 'html');
+      
+      let parser = new DOMParser();
+      let doc = parser.parseFromString(html, 'text/html');
+      let results = [];
+      
+      let resultNodes = doc.querySelectorAll('.result__body');
+      
+      resultNodes.forEach((node, index) => {
+        if(index >= 5) return; 
+        let titleEl = node.querySelector('.result__a');
+        let snippetEl = node.querySelector('.result__snippet');
+        
+        if(titleEl) {
+          let title = titleEl.textContent.trim();
+          let link = titleEl.getAttribute('href');
+          
+          if(link && link.includes('uddg=')) {
+            link = decodeURIComponent(link.split('uddg=')[1].split('&')[0]);
+          }
+          
+          let snippet = snippetEl ? snippetEl.textContent.trim() : 'Нет описания';
+          results.push({ title, link, snippet });
+        }
+      });
+
+      let nodeData = nodes.get(id);
+      if (results.length > 0) {
+        nodeData.meta.stats = `✅ Найдено: ${results.length}`;
+        nodeData.meta.searchResults = results;
+        nodeData.meta.link = `https://duckduckgo.com/?q=${encodeURIComponent(query)}`;
+        nodeData.label = `Live Search\n✅ Найдено: ${results.length}\n${query.substring(0, 15)}...`;
+      } else {
+        nodeData.meta.stats = `⚠️ Результатов нет`;
+        nodeData.meta.link = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+        nodeData.label = `Live Search\n⚠️ Результатов нет`;
+      }
+      nodes.update(nodeData);
+
+      if (network.getSelectedNodes().includes(id)) renderInspector(nodeData);
+
+    } catch(e) {
+      let nodeData = nodes.get(id);
+      nodeData.meta.stats = `❌ Ошибка CORS`;
+      nodeData.meta.link = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+      nodeData.label = `Live Search\n❌ Ошибка CORS`;
+      nodes.update(nodeData);
+      if (network.getSelectedNodes().includes(id)) renderInspector(nodeData);
+    }
   }
 
 })();
